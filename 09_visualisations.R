@@ -780,17 +780,25 @@ chart_a8 <- ggplot(
   ) +
   scale_y_discrete(labels = geographic_tier_labels) +
   labs(
-    title = "Thinner apprenticeship markets have far narrower geographic reach",
-    subtitle = "Share of standards delivered in more than one quarter of LSIP areas",
-    x = "Standards present in more than 25% of LSIP areas",
+    title = "Low-start standards have narrower recorded delivery footprints",
+    subtitle = paste0("Share of mapped standards recorded in at least ",
+                      floor(n_lsips / 4) + 1L, " of ", n_lsips, " analytical areas"),
+    x = "Standards recorded in more than 25% of analytical areas",
     y = NULL,
     fill = NULL,
-    caption = paste0(
-      "Source: DfE underlying apprenticeship starts data, ", ref_year_label, ".",
-      "\nDelivery is measured directly by training delivery location. Provider dependency markets are excluded ",
-      "because they are a separate high-volume market situation.",
-      "\nGeographic match coverage: ", scales::comma(geographic_observed_n),
-      " of ", scales::comma(geographic_expected_n), " eligible standards."
+    caption = paste(
+      str_wrap(paste0("Source: DfE underlying apprenticeship starts data, ", ref_year_label, "."), width = 115),
+      str_wrap(paste0(
+        "Recorded delivery-postcode basis; 38 non-London LSIP areas and four London subregions. ",
+        "Provider-dependency markets are excluded."
+      ), width = 115),
+      str_wrap(paste0(
+        "Geographic match coverage: ", scales::comma(geographic_observed_n),
+        " of ", scales::comma(geographic_expected_n),
+        " eligible standards. Outside-England/unknown-only standards are omitted."
+      ), width = 115),
+      "Recorded delivery locations do not measure all offered provision or employer access.",
+      sep = "\n"
     )
   ) +
   guides(fill = "none") +
@@ -836,7 +844,11 @@ if (!live_stock_objects_current) {
 
 
 live_stock_peak <- live_stock %>%
-  slice_max(.data$live, n = 1, with_ties = FALSE)
+  slice_max(.data$live, n = 1, with_ties = TRUE)
+
+live_stock_peak_months <- paste(format(live_stock_peak$date, "%B %Y"), collapse = " and ")
+stock_paused_at_snapshot <- sum(skills_england_dedup$is_paused, na.rm = TRUE)
+stock_available_at_snapshot <- sum(skills_england_dedup$is_available_for_starts, na.rm = TRUE)
 
 
 live_stock_latest <- live_stock %>%
@@ -873,20 +885,22 @@ chart_live_stock <- ggplot(live_stock, aes(x = .data$date, y = .data$live)) +
     expand = expansion(mult = c(0, 0.08))
   ) +
   labs(
-    title = "Live stock of apprenticeship standards",
+    title = "Approved stock of apprenticeship standards",
     subtitle = paste0(
       "Standards approved for delivery and not since retired or withdrawn, England.\n",
-      "Peak: ", scales::comma(live_stock_peak$live), " in ",
-      format(live_stock_peak$date, "%B %Y"), "; ",
+      "Peak: ", scales::comma(max(live_stock_peak$live)), " in ",
+      live_stock_peak_months, "; ",
       "latest: ", scales::comma(live_stock_latest$live), " in ",
       format(live_stock_latest$date, "%B %Y"), "."
     ),
     x = NULL,
-    y = "Standards available",
+    y = "Approved standards not retired or withdrawn",
     caption = paste0(
       src_skills_england,
-      "\nNote: the catalogue extract is accurate as of 1 June 2026; ",
-      "the series does not extend beyond that snapshot."
+      "\nIncludes ", stock_paused_at_snapshot, " paused standards at the final snapshot; ",
+      stock_available_at_snapshot, " standards were available for new starts.",
+      "\nThis is reconstructed approved stock, not historical availability for new starts. ",
+      "The series ends at the catalogue snapshot."
     )
   ) +
   theme_house(base_size = 11.5) +
@@ -1819,6 +1833,12 @@ review_group_overlap <- chart_a9_links %>%
   filter(.data$sectors > 1) %>%
   nrow()
 
+core_review_group_overlap <- chart_a9_links %>%
+  filter(.data$is8_sector != "Foundational Industries and Inputs") %>%
+  count(.data$standard_ref, name = "sectors") %>%
+  filter(.data$sectors > 1) %>%
+  nrow()
+
 
 chart_a9 <- ggplot(
   chart_a9_data,
@@ -1887,7 +1907,8 @@ chart_a9 <- ggplot(
         paste0(
           scales::comma(review_group_overlap), " of ",
           scales::comma(review_group_standards),
-          " review-group standards match more than one sector. ",
+          " review-group standards match more than one mapped category, including foundational; ",
+          scales::comma(core_review_group_overlap), " match multiple core IS8 sectors. ",
           scales::comma(core_review_total),
           " unique standards link to at least one of the eight core sectors; ",
           scales::comma(expanded_review_total),
@@ -1901,7 +1922,7 @@ chart_a9 <- ggplot(
   theme_house(base_size = 11.5) +
   theme(
     legend.position = "top",
-    strip.text.y = element_text(face = "bold", colour = colour_text),
+    strip.text.y = element_text(face = "bold", colour = colour_text, angle = 0),
     axis.title.x = element_text(face = "bold"),
     plot.caption.position = "plot"
   )
@@ -1919,8 +1940,7 @@ save_chart(
 
 message(
   paste0(
-    "\n09_visualisations.R complete: twelve report charts built and saved, ",
+    "\n09_visualisations.R complete: eleven report charts built and saved, ",
     "including revised funding and IS8 figures."
   )
 )
-

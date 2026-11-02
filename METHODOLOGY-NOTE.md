@@ -2,7 +2,7 @@
 
 **Apprenticeship thin markets in England — analytical approach**
 
-*Final analytical method. Last updated 12 August 2026.*
+*Publication-snapshot method. Updated 2 November 2026 to document the October code corrections.*
 
 This note explains how the analysis in this repository works: where the data comes from, how key terms are defined, the choices made in constructing the measures, and the limitations a reader should keep in mind. It assumes no prior familiarity with apprenticeship statistics.
 
@@ -10,7 +10,7 @@ This note explains how the analysis in this repository works: where the data com
 
 ## 1. What this analysis is trying to find out
 
-England has around 675 apprenticeship standards approved for delivery. They vary enormously in size: the largest attracts more than 12,000 starts a year, while many attract only a handful, and some attract none at all.
+The 1 June 2026 catalogue contains 675 standards available for new starts and 712 approved and not retired or withdrawn, including 37 paused standards. The 2024/25 delivery population contains 644 standards. They vary enormously in size: the largest attracts more than 12,000 starts a year, while many attract only a handful, and some attract none at all.
 
 A standard with very few starts, delivered by very few training providers, is fragile. If one provider withdraws, the standard may become effectively unavailable — even though it remains formally approved, and even though employers may still need those skills. We refer to this as a **thin market**.
 
@@ -51,7 +51,7 @@ The exports used here cover the **2024/25 academic year** and reconcile to the p
 
 ### 2.3 Unsuppressed underlying starts archives
 
-The release's supporting files contain unsuppressed row-level starts. The
+The release's supporting files contain unsuppressed granular start counts. The
 current archive provides 2020/21 onwards and the 2019/20 archive provides
 2017/18 to 2019/20. These are aggregated by academic year and standard
 reference to produce exact historical activity, low-start and concentration
@@ -120,7 +120,7 @@ One area was also renamed: *Information and Communication Technology* became *Di
 
 Two sources have to be linked for this analysis: the starts data, which says how much activity each standard attracted, and the Skills England catalogue, which supplies its route, level, funding band and status.
 
-**The starts export identifies standards by name only.** It carries no reference code, so the link has to be made on the standard's title, normalised for case and spacing. Most match exactly. A handful do not, because the two sources spell the same standard differently:
+**The provider dashboard export identifies standards by name only.** It carries no reference code, so the link has to be made on the standard's title, normalised for case and spacing. Most match exactly. A handful do not, because the two sources spell the same standard differently:
 
 | In the starts data | In the catalogue | Why they differ |
 |---|---|---|
@@ -139,7 +139,9 @@ The aliases are recorded with the reasoning for each, and two carry residual unc
 
 Frameworks are deliberately left unmatched. They have no standard reference by definition, and account for 40 starts in total.
 
-**The wider point.** Name-based linking is inherently fragile, because names drift as standards are revised. The alias table is a practical fix, not a structural one. Any future release should be checked against the unmatched list before results are relied on; that list is written out with every run.
+For delivery geography, the underlying archive carries stable ST references. The corrected geography and map scripts join on these references, retaining names as diagnostics. This avoids conflating renamed standards or different standards sharing a title.
+
+**The wider point.** Name-based dashboard-to-catalogue linking is inherently fragile, because names drift as standards are revised. The alias table is a practical fix, not a structural one. Any future release should be checked against the unmatched list before results are relied on; that list is written out with every run.
 
 ### 3.6 STEM
 
@@ -189,7 +191,7 @@ The proportion of suppressed cells differs greatly between files, and is high en
 
 The pattern is driven by granularity: the finer the cross-tabulation, the smaller each cell, and the more cells fall below the publication threshold.
 
-**Where suppression exceeds half of all cells, totals derived from that file should be treated as lower bounds, not as counts.** In the geography detailed file, roughly four in five cells are suppressed, so any sum of starts by region and subject captures only a minority of activity. Counts of *standards* remain reliable in these files because suppressed observations are retained; counts of *starts* do not.
+**Where suppression exceeds half of all cells, totals derived from that file should be treated as lower bounds, not as counts.** In the geography detailed file, roughly four in five cells are suppressed, so any sum of starts by region and subject captures only a minority of activity. Suppressed observations are retained, but a `low` cell may represent zero and cannot establish that a standard had starts. Positive-activity counts require the unsuppressed sources.
 
 This is the main reason the analysis draws on the provider dashboard exports for standard-level work: they carry no suppression at all, so both the count of standards and the volume of starts are complete.
 
@@ -201,7 +203,7 @@ This is the main reason the analysis draws on the provider dashboard exports for
 
 Each standard is placed on two dimensions:
 
-- **Annual starts** — how much demand there is
+- **Annual starts**: recorded programme-start volume, not a direct measure of employer demand
 - **Provider count** — how many distinct training providers delivered it
 
 Both come from the same provider dashboard export, so both are measured on the same population, in the same year, on the same basis. Taking the two axes from different sources risks comparing a current measure against a lagged one.
@@ -210,7 +212,6 @@ Both come from the same provider dashboard export, so both are measured on the s
 
 | Tier | Definition |
 |---|---|
-| **No starts recorded** | Approved for delivery, but no starts in the year |
 | **Severe thin market** | Fewer than 20 starts and 2 or fewer providers |
 | **Thin market** | Fewer than 50 starts and 3 or fewer providers |
 | **Potential thin market** | Fewer than 100 starts and 5 or fewer providers |
@@ -239,9 +240,11 @@ standard-location once regardless of how many sectors match.
 
 The severe-plus-thin review group contains 139 unique standards linked to at
 least one core sector, 165 linked to a core sector or the additional
-foundational category, 192 distinct standard-sector links and 25 standards
-linked to more than one sector. These are reproducible outputs of the proxy
+foundational category, 191 distinct standard-category links and 24 standards
+linked to more than one category, including the foundational category. Of these, 23 match more than one core IS-8 sector. These are reproducible outputs of the proxy
 rules, not official sector-membership facts.
+
+The title rule matches HR as a standalone token, avoiding a false match inside “Through” in ST0740. This reduces PBS review-group links from 24 to 23 without changing the 139/165 unique totals.
 
 A first-match field is retained only for audit outputs that require one row per
 standard. It is not the basis for the report's sector chart or panels.
@@ -256,25 +259,23 @@ classify them. They are part of the 715-standard analytical universe but not the
 
 ---
 
-## 5.5 Measuring geographic spread---
-
 ## 5.5 Measuring geographic spread
 
 A standard's geographic footprint is measured **directly**: the underlying starts file records starts by standard and by local authority district, so the areas in which a standard was delivered are observed rather than inferred.
 
 An alternative approach, used in earlier versions of this analysis, distributes each provider's total starts across the areas that provider operates in. That method systematically overstates spread. A standard delivered by a single national provider is credited to every area that provider works in, whether or not the standard was taught there. The difference is large: on the direct measure, the most fragile standards are delivered in a median of one Local Skills Improvement Plan area.
 
-**Spread is reported on two geographies**, because a share expressed as "present in more than a quarter of areas" depends entirely on how many areas exist. England has around 300 local authority districts and around 40 LSIP areas, so the same standard clears the district test far less easily. Districts are assigned to LSIP areas by locating each district's centroid within an LSIP boundary; all 296 districts match, across 42 LSIP areas.
+**Spread is reported on two geographies**, because a share expressed as "present in more than a quarter of areas" depends entirely on how many areas exist. England has around 300 local authority districts and around 40 LSIP areas, so the same standard clears the district test far less easily. Districts are assigned using a point on each district’s surface within the boundary lookup, rather than a centroid. The retained lookup assigns 296 districts to 42 analytical areas: 38 non-London LSIP areas and four London subregions. These are not 42 designated LSIPs. For the reach chart, 633 of 637 eligible standards have mapped delivery; provider-dependency markets are excluded. Recorded delivery does not measure employer access or demand.
 
 ## 5.6 Approval dates
 
 The catalogue records an approval date per standard version. Because a standard may be revised several times, the **earliest** approval date across versions is used: the question is when a standard first became available, and dating it by its most recent revision would push the distribution artificially late.
 
-Approval dates are parseable for 89.3% of standards. Those without a date are reported separately and excluded from percentages rather than being treated as early approvals.
+Approval dates are recorded for 820 of 918 catalogue standards (89.3%). Of those 820, 654 (79.8%) were approved on or after 6 April 2017. This is not a percentage of all 918 records. Those without a date are reported separately and excluded from percentages rather than being treated as early approvals.
 
 Two bases are reported: all standards, and live standards only, excluding those with a retired or withdrawn date.
 
-Any association between approval date and market thinness should be read as association, not causation. Approval date and market size are both related to how recently an occupation was formalised, and a newer standard has had less time to build volume. That confound is testable and is reported: median approval dates by tier differ by only around 1.4 years, which is too small to account for the observed differences in post-levy share.
+Any association between approval date and market thinness should be read as association, not causation. Approval date and market size are both related to how recently an occupation was formalised, and a newer standard has had less time to build volume. The recorded median approval-date gap is about 510 days, or 17 months. This descriptive gap does not control for age or rule it out as an explanation of differences in observed starts.
 
 ## 6. Limitations
 
@@ -298,7 +299,7 @@ historical activity population and exact start counts.
 
 **Standards data is as at publication.** Standard names, routes and mandatory-degree flags reflect the Skills England catalogue at the point of publication, not as at the date each apprenticeship started.
 
-**Population rates were rebased.** Population estimates in the July 2026 release were rebased to the 2024 Census and all historic rates restated, so rates per 100,000 differ from those in earlier publications.
+**Population rates.** Any rates per 100,000 depend on the population estimates supplied with the selected release; retain the same source vintage when comparing published rates.
 
 **Comparability over time.** Several breaks affect the series: the method for dating achievements on standards changed in 2019/20; 2020/21 counted returners from COVID-related breaks as continuing rather than as new starts; provider type categories were realigned in November 2025; and level 7 funding was restricted from January 2026.
 
@@ -314,9 +315,11 @@ Scripts run in numeric order. Each is self-documenting at the top with what it r
 | `01_functions.R` | Shared helpers, including suppression-aware file reading |
 | `02_load_data.R` | Reads and standardises every source; validates against published totals |
 
-The production pipeline is complete: `00_config.R` to `10_maps.R`, with `99_run_all.R` running the sequence and verifying expected outputs.
+The pipeline includes the six publication-figure aliases and supporting data, as listed in README.md. The illustrative table selects ten severe and ten thin examples using explicit ST references, with assertions on uniqueness and tier counts.
 
-Every parameter a future refresh might need to change — reference year, thresholds, file paths — is in `00_config.R`. Nothing else hardcodes a year.
+The production pipeline is complete: `00_config.R` to `11_publication_outputs.R`, with `99_run_all.R` running the sequence and verifying expected outputs.
+
+Reference years, thresholds and input paths are configured in `00_config.R`. The publication-export module additionally contains explicitly labelled expected totals for the frozen snapshot; later snapshots retain structural checks without imposing those old totals.
 
 ---
 
@@ -329,3 +332,7 @@ Every parameter a future refresh might need to change — reference year, thresh
 - ONS Open Geography Portal — boundary and lookup files
 
 All DfE data is published under the Open Government Licence v3.0.
+
+## Validation status
+
+The October focused R validation passed 41 publication checks on retained audited inputs. It did not constitute a full raw-data `99_run_all.R` rebuild in the user’s Windows environment. This code sync does not add such a claim. See README.md for the run manifests and the six publication aliases.

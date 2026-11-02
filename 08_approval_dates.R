@@ -338,10 +338,9 @@ print(approval_age_by_tier)
 
 
 # --- SECTION 9: LIVE STOCK OF STANDARDS OVER TIME -----------------------------
-# The stock of standards available at each point in time, rather than the
-# cumulative count of approvals. A standard enters the stock when it is
-# approved for delivery and leaves when it is retired or withdrawn, so the
-# series shows what the system actually offered at any given date.
+# Reconstructed approved stock, rather than cumulative approvals. A standard
+# enters when approved and leaves at a dated retirement or withdrawal. Pauses
+# are not historical exits here: this is not availability for new starts.
 #
 # Cumulative approvals would only ever rise, and would overstate the size of
 # the live catalogue by counting standards that have since been removed.

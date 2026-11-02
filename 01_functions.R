@@ -47,7 +47,7 @@ detect_measure_cols <- function(df) {
 #' Convert measure columns to numeric while preserving suppression information
 #'
 #' EES writes the string "low" where a count is too small to publish, in
-#' practice a value between 1 and 9 after rounding to the nearest 10. Coercing
+#' these table-tool files a raw value from 0 to 4, including zero. Coercing
 #' this directly to numeric produces NA, which is indistinguishable from a
 #' genuinely missing value and invisible to any later filter.
 #'
@@ -479,7 +479,7 @@ save_table <- function(df, filename) {
 }
 
 
-# --- SECTION 8: VERSION MARKER ------------------------------------------------
+# --- SECTION 9: VERSION MARKER ------------------------------------------------
 # Printed on load so it is obvious which copy of this file is in the session.
 # Scripts are edited in one location and run from another, so a stale copy is
 # an easy mistake to make and an awkward one to diagnose: functions silently

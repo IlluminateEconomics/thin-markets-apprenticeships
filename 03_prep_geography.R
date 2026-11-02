@@ -102,7 +102,7 @@ if (length(historical_existing) > 1) {
 }
 
 cache_signature <- list(
-  cache_version = 3L,
+  cache_version = 4L,
   source_path = normalizePath(underlying_starts_zip, mustWork = FALSE),
   source_size = if (is.null(source_info)) NA_real_ else unname(source_info$size),
   source_mtime_utc = if (is.null(source_info)) {
@@ -254,8 +254,8 @@ message("  Years available: ", paste(available_years, collapse = ", "))
 
 
 # --- SECTION 4: EXACT STANDARD-YEAR STARTS -----------------------------------
-# Unlike the public table-tool extracts, the underlying files contain one row
-# per observed start and do not replace small counts with `low`. This produces
+# Unlike the public table-tool extracts, the underlying files contain granular
+# unsuppressed start counts and do not replace small counts with `low`. This produces
 # the exact historical series used for the report's activity, low-volume and
 # concentration charts. ST reference is used where present, with a normalised
 # name fallback for the small number of historical rows without a code.
@@ -355,7 +355,10 @@ geo_lad_standard <- underlying_starts %>%
     !is.na(.data$geo_lad), .data$geo_lad != "",
     .data$std_fwk_flag == "Standard"
   ) %>%
-  group_by(.data$academic_year, .data$geo_lad, .data$std_fwk_name) %>%
+  mutate(
+    standard_ref = str_to_upper(str_trim(as.character(.data$st_code)))
+  ) %>%
+  group_by(.data$academic_year, .data$geo_lad, .data$standard_ref, .data$std_fwk_name) %>%
   summarise(
     starts           = sum(.data$starts, na.rm = TRUE),
     suppressed_cells = sum(.data$starts_suppressed, na.rm = TRUE),

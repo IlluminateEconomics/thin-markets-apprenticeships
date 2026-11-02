@@ -126,12 +126,12 @@ market_standard_links <- thin_market_is8 %>%
   mutate(name_key = normalise_geography_standard_name(.data$standard_name))
 
 market_name_key_conflicts <- market_standard_links %>%
-  count(.data$name_key, name = "standard_references") %>%
+  count(.data$standard_ref, name = "standard_references") %>%
   filter(.data$standard_references > 1)
 
 if (nrow(market_name_key_conflicts) > 0) {
   stop(
-    "Normalised dashboard names map to more than one standard reference. ",
+    "Dashboard standard references are not unique. ",
     "Inspect market_name_key_conflicts before geographic joins.",
     call. = FALSE
   )
@@ -141,9 +141,16 @@ geo_lad_standard_reference_year <- geo_lad_standard %>%
   filter(.data$academic_year %in% c(ref_year, ref_year_label, as.character(ref_year))) %>%
   mutate(name_key = normalise_geography_standard_name(.data$std_fwk_name))
 
+if (!"standard_ref" %in% names(geo_lad_standard_reference_year) ||
+    any(is.na(geo_lad_standard_reference_year$standard_ref)) ||
+    any(geo_lad_standard_reference_year$standard_ref == "")) {
+  stop("Rebuild 03 geography aggregates with valid stable ST references before joining.",
+       call. = FALSE)
+}
+
 geo_standard_name_variants <- geo_lad_standard_reference_year %>%
-  distinct(.data$name_key, .data$std_fwk_name) %>%
-  group_by(.data$name_key) %>%
+  distinct(.data$standard_ref, .data$std_fwk_name) %>%
+  group_by(.data$standard_ref) %>%
   summarise(
     source_name_variants = n(),
     source_names = paste(sort(unique(.data$std_fwk_name)), collapse = "; "),
@@ -151,7 +158,7 @@ geo_standard_name_variants <- geo_lad_standard_reference_year %>%
   )
 
 standard_footprint <- geo_lad_standard_reference_year %>%
-  group_by(.data$name_key) %>%
+  group_by(.data$standard_ref) %>%
   summarise(
     districts      = n_distinct(.data$geo_lad),
     starts_in_area = sum(.data$starts, na.rm = TRUE),
@@ -161,13 +168,13 @@ standard_footprint <- geo_lad_standard_reference_year %>%
 
 tier_lad_dispersion <- market_standard_links %>%
   select(standard_ref, standard_name, name_key, tier, starts, providers) %>%
-  left_join(standard_footprint, by = "name_key")
+  left_join(standard_footprint, by = "standard_ref")
 
 geography_standard_link_audit <- market_standard_links %>%
   select(standard_ref, standard_name, name_key, tier, starts, providers) %>%
-  left_join(geo_standard_name_variants, by = "name_key") %>%
-  mutate(name_matched = !is.na(.data$source_name_variants)) %>%
-  arrange(.data$name_matched, .data$standard_name)
+  left_join(geo_standard_name_variants, by = "standard_ref") %>%
+  mutate(reference_matched = !is.na(.data$source_name_variants)) %>%
+  arrange(.data$reference_matched, .data$standard_name)
 
 report_match(tier_lad_dispersion, "districts", "tier to geographic footprint")
 
@@ -193,9 +200,8 @@ print(tier_dispersion_summary)
 # comparable. Both are reported.
 #
 # The underlying data carries district names, not LSIP codes, so districts are
-# assigned to LSIP areas by locating each district's centroid within an LSIP
-# polygon. A district straddling a boundary is assigned to whichever area
-# contains its centroid.
+# assigned to LSIP areas using one point on the surface of each district.
+# This is not a centroid, area-weighted allocation or postcode-level LSIP join.
 
 lsip_name_col <- names(lsip_boundaries)[
   str_detect(names(lsip_boundaries), regex("^LSIP[0-9]*NM$|lsip_name|LSIP_NAME", ignore_case = TRUE))
@@ -249,13 +255,13 @@ if (!is.null(lad_to_lsip)) {
 
   standard_lsip_footprint <- geo_lad_standard_reference_year %>%
     inner_join(lad_to_lsip, by = c("geo_lad" = "lad_name")) %>%
-    group_by(.data$name_key) %>%
+    group_by(.data$standard_ref) %>%
     summarise(lsips = n_distinct(.data$lsip_name), .groups = "drop") %>%
     mutate(pct_lsips = round(100 * .data$lsips / n_lsips, 1))
 
   tier_lsip_dispersion <- market_standard_links %>%
     select(standard_ref, standard_name, name_key, tier, starts) %>%
-    left_join(standard_lsip_footprint, by = "name_key")
+    left_join(standard_lsip_footprint, by = "standard_ref")
 
   tier_lsip_summary <- tier_lsip_dispersion %>%
     filter(!is.na(.data$lsips)) %>%
@@ -264,7 +270,9 @@ if (!is.null(lad_to_lsip)) {
       standards            = n(),
       median_lsips         = median(.data$lsips),
       median_pct_lsips     = median(.data$pct_lsips),
-      pct_in_over_quarter  = round(100 * mean(.data$pct_lsips > 25), 1),
+      standards_in_over_quarter = sum(.data$lsips > n_lsips / 4),
+      analytical_areas      = n_lsips,
+      pct_in_over_quarter  = round(100 * mean(.data$lsips > n_lsips / 4), 1),
       median_starts        = median(.data$starts),
       .groups = "drop"
     )
@@ -325,7 +333,7 @@ message("\n  Districts inside a strategic authority: ", nrow(msa_lookup),
 
 standard_msa_footprint <- geo_lad_standard_reference_year %>%
   left_join(msa_lookup, by = c("geo_lad" = "lad_name")) %>%
-  group_by(.data$name_key) %>%
+  group_by(.data$standard_ref) %>%
   summarise(
     msas            = n_distinct(.data$msa_name[!is.na(.data$msa_name)]),
     starts_in_msa   = sum(.data$starts[!is.na(.data$msa_name)], na.rm = TRUE),
@@ -339,7 +347,7 @@ standard_msa_footprint <- geo_lad_standard_reference_year %>%
 
 tier_msa_summary <- market_standard_links %>%
   select(standard_ref, standard_name, name_key, tier, starts, providers) %>%
-  left_join(standard_msa_footprint, by = "name_key") %>%
+  left_join(standard_msa_footprint, by = "standard_ref") %>%
   filter(!is.na(.data$msas)) %>%
   group_by(.data$tier) %>%
   summarise(
@@ -370,8 +378,8 @@ print(tier_msa_summary)
 reach_per_provider <- market_standard_links %>%
   select(standard_ref, standard_name, name_key, tier, starts, providers) %>%
   left_join(
-    select(standard_lsip_footprint, name_key, lsips),
-    by = "name_key"
+    select(standard_lsip_footprint, standard_ref, lsips),
+    by = "standard_ref"
   ) %>%
   filter(!is.na(.data$lsips), .data$providers > 0) %>%
   mutate(areas_per_provider = .data$lsips / .data$providers) %>%

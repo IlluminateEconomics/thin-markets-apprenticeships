@@ -50,10 +50,9 @@ if (!exists("lad_to_lsip", inherits = TRUE)) {
 }
 
 
-# --- SECTION 1: STANDARD-NAME LINK -------------------------------------------
-# The underlying starts file identifies standards by name, not ST reference.
-# Exact dashboard names are therefore preferred over catalogue names. This
-# ordering matters where two catalogue references share a displayed name.
+# --- SECTION 1: STABLE STANDARD-REFERENCE LINK -------------------------------
+# The underlying file contains ST references. Names below are retained only
+# as diagnostics; all map selection and aggregation use the stable code.
 
 
 normalise_map_name <- function(x) {
@@ -129,7 +128,17 @@ geo_standard_reference_year <- geo_lad_standard %>%
 
 
 geo_standard_linked <- geo_standard_reference_year %>%
-  left_join(standard_name_lookup, by = "name_key")
+  mutate(
+    standard_ref = str_to_upper(str_trim(as.character(.data$standard_ref))),
+    matched_candidate_name = .data$std_fwk_name,
+    candidate_source = "DfE underlying stable standard reference"
+  )
+
+if (any(is.na(geo_standard_linked$standard_ref)) ||
+    any(geo_standard_linked$standard_ref == "")) {
+  stop("Rebuild 03 geography aggregates with valid stable ST references before mapping.",
+       call. = FALSE)
+}
 
 
 map_unmatched_standard_names <- geo_standard_linked %>%
@@ -372,18 +381,29 @@ map_1 <- ggplot(map_1_data) +
   ) +
   coord_sf(datum = NA) +
   labs(
-    title = "Severe and thin proxy-mapped apprenticeship delivery by LSIP area",
+    title = "Recorded delivery of severe and thin proxy-linked standards",
     subtitle = paste0(
-      "Directly observed starts across ",
+      "Geographically assigned starts from ",
       scales::comma(nrow(is8_review_group_standards)),
-      " standards, ", ref_year_label,
+      " selected standards; ",
+      scales::comma(n_distinct(geo_review_group$standard_ref[!is.na(geo_review_group$lsip_key)])),
+      " with mapped English starts, ", ref_year_label,
       "\nCore Industrial Strategy sectors plus the additional foundational category"
     ),
     caption = paste0(
       "Source: DfE underlying apprenticeship starts data, ", ref_year_label,
       "; Skills England catalogue as at ", skills_england_asat, ".",
-      "\nDelivery location basis. Suppressed starts are excluded from totals but recorded in the audit.",
-      "\nSector assignment is an indicative route-and-title proxy, not an official classification. Fill uses a square-root scale."
+      "\nRecorded delivery-postcode basis. Outside-England/unknown starts are excluded from mapped totals.",
+      "\n", scales::comma(sum(review_lsip_totals$starts)), " mapped starts; ",
+      scales::comma(sum(geo_review_group$starts[is.na(geo_review_group$lsip_key)])),
+      " outside-England/unknown starts excluded. Each standard is counted once.",
+      "\nAreas comprise 38 non-London LSIP areas and four London subregions.",
+      "\nSector assignment is an indicative route-and-title proxy, not an official classification. Fill uses a square-root scale.",
+      if (sum(geo_review_group$suppressed_cells) == 0) {
+        "\nNo suppressed starts occur in the selected source. Locations do not measure employer access."
+      } else {
+        "\nSuppressed-cell counts are retained in the data tables; locations do not measure employer access."
+      }
     )
   ) +
   theme_void(base_size = 11.5) +
@@ -412,6 +432,98 @@ save_chart(
   width = 9.2,
   height = 8.0
 )
+
+
+# --- SECTION 3b: FIGURE 2, ALL PROXY-LINKED STANDARDS -------------------------
+# Full 644-standard delivery population, with unique inclusive proxy matches.
+# This is deliberately broader than the severe/thin maps. No industrial-
+# strength alignment test or provider-profile allocation is used. Existing
+# regional callouts in Word may remain as separately attributed policy context.
+
+is8_all_linked_standards <- thin_market_is8 %>%
+  filter(.data$is8_n_sectors_matched > 0) %>%
+  distinct(.data$standard_ref)
+
+geo_all_proxy <- geo_standard_linked %>%
+  semi_join(is8_all_linked_standards, by = "standard_ref") %>%
+  mutate(lad_key = normalise_geo_name(.data$geo_lad)) %>%
+  left_join(
+    select(lad_to_lsip_map, lad_key, lsip_name, lsip_key),
+    by = "lad_key"
+  )
+
+all_proxy_area_totals <- geo_all_proxy %>%
+  filter(!is.na(.data$lsip_key)) %>%
+  group_by(.data$lsip_key) %>%
+  summarise(
+    starts = sum(.data$starts, na.rm = TRUE),
+    suppressed_cells = sum(.data$suppressed_cells, na.rm = TRUE),
+    standards = n_distinct(.data$standard_ref),
+    .groups = "drop"
+  )
+
+if (nrow(anti_join(all_proxy_area_totals,
+                  st_drop_geometry(lsip_boundary_base), by = "lsip_key")) > 0) {
+  stop("Figure 2 has analytical areas without matching map boundaries.", call. = FALSE)
+}
+
+figure_2_data <- lsip_boundary_base %>%
+  left_join(all_proxy_area_totals, by = "lsip_key") %>%
+  mutate(
+    starts = replace_na(.data$starts, 0),
+    suppressed_cells = replace_na(.data$suppressed_cells, 0),
+    standards = replace_na(.data$standards, 0)
+  )
+
+figure_2_summary <- tibble(
+  selected_standards = nrow(is8_all_linked_standards),
+  mapped_standards = n_distinct(geo_all_proxy$standard_ref[!is.na(geo_all_proxy$lsip_key)]),
+  selected_starts = sum(geo_all_proxy$starts, na.rm = TRUE),
+  mapped_starts = sum(figure_2_data$starts, na.rm = TRUE),
+  outside_unknown_starts = sum(geo_all_proxy$starts[is.na(geo_all_proxy$lsip_key)], na.rm = TRUE),
+  analytical_areas = nrow(figure_2_data),
+  suppressed_cells = sum(geo_all_proxy$suppressed_cells, na.rm = TRUE)
+)
+
+# Reuse the original aggregate map's exact geoms, gradient and theme.
+figure_2 <- map_1 %+% figure_2_data +
+  labs(
+    title = "Recorded starts on Industrial Strategy proxy-linked standards",
+    subtitle = paste0(
+      "All core-sector and additional foundational proxy matches, ", ref_year_label,
+      "\n", figure_2_summary$selected_standards, " selected standards; ",
+      figure_2_summary$mapped_standards, " with mapped English starts"
+    ),
+    caption = paste(
+      str_wrap(paste0(
+        "Source: DfE underlying apprenticeship starts data, ", ref_year_label,
+        "; Skills England catalogue as at ", skills_england_asat, "."
+      ), width = 105),
+      str_wrap(paste0(
+        scales::comma(figure_2_summary$mapped_starts), " mapped starts; ",
+        scales::comma(figure_2_summary$outside_unknown_starts),
+        " outside-England/unknown starts excluded. Each standard is counted once."
+      ), width = 105),
+      str_wrap(paste0(
+        "Areas comprise 38 non-London LSIPs and four London subregions. ",
+        "No provider-profile allocation; map colours show recorded starts."
+      ), width = 105),
+      str_wrap(paste0(
+        "The inclusive route-and-title proxy is not an official sector classification. ",
+        "Recorded locations do not measure employer demand or access. Fill uses a square-root scale."
+      ), width = 105),
+      sep = "\n"
+    )
+  )
+
+save_table(
+  figure_2_data %>% st_drop_geometry() %>%
+    select(analytical_area = boundary_lsip_name, lsip_key,
+           starts, suppressed_cells, standards),
+  "figure_02_all_proxy_linked_delivery_data.csv"
+)
+save_table(figure_2_summary, "figure_02_all_proxy_linked_delivery_summary.csv")
+save_chart(figure_2, "figure_02_all_proxy_linked_delivery.png", width = 9.2, height = 8.8)
 
 
 # --- SECTION 4: MAP 2, REVIEW-GROUP DELIVERY BY SECTOR -----------------------
@@ -564,7 +676,7 @@ map_a3_sector <- ggplot(map_a3_sector_data) +
   labs(
     title = "Geographic distribution of severe and thin markets by indicative sector",
     subtitle = paste0(
-      "Each panel shows the LSIP share of directly observed starts linked to that sector, ",
+      "Each panel shows the area share of geographically assigned starts linked to that sector, ",
       ref_year_label
     ),
     caption = paste(
@@ -586,7 +698,9 @@ map_a3_sector <- ggplot(map_a3_sector_data) +
       str_wrap(
         paste0(
           "The mapping is indicative and is not an official sector crosswalk. Foundational ",
-          "Industries and Inputs is an additional analytical category, not a ninth official IS sector."
+          "Industries and Inputs is an additional analytical category, not a ninth official IS sector. ",
+          "Areas comprise 38 non-London LSIPs and four London subregions. Outside-England and ",
+          "unknown locations are omitted. Recorded postcodes do not measure demand or access."
         ),
         width = 125
       ),
@@ -631,6 +745,6 @@ save_chart(
 
 
 message(
-  "\n10_maps.R complete: two direct-delivery maps saved. Minimum link coverage: ",
+  "\n10_maps.R complete: three direct-delivery maps saved. Minimum link coverage: ",
   min(map_coverage_summary$pct_coverage), "%"
 )

@@ -1,8 +1,12 @@
 # Apprenticeship market structure in England
 
-This repository contains the analysis behind our work on thin markets in England's apprenticeship system. England has around 712 approved apprenticeship standards, and they vary enormously in scale: the largest attracts more than 12,000 starts a year, while many attract fewer than ten and some attract none at all. A standard with very few starts, delivered by very few training providers, is fragile — if one provider withdraws it can become effectively unavailable, even though it remains formally approved and employers may still need those skills. The analysis identifies which standards are in that position, where they are concentrated by subject and by place, and how exposed the system is if provision withdraws.
+R analysis supporting Illuminate Economics’ Gatsby Foundation report on employer representative bodies and England’s apprenticeship system. The publication snapshot uses 2024/25 starts, the July 2026 DfE release and the Skills England catalogue extracted on 1 June 2026.
 
-The code produces a six-tier classification of every standard by annual starts and provider count, together with the supporting distribution, concentration, threshold-sensitivity, approval-date and geographic analysis. Two choices shape the results and are worth knowing before reading any output. **The analysis uses the unsuppressed underlying data files rather than the summary tables wherever precision matters.** The published summary tables round counts to the nearest ten and replace small values with a `low` marker that covers zero as well as one to nine, which makes it impossible to count small standards from them; the underlying files carry exact figures, so the historical series here are exact rather than estimated. **Geographic reach is measured directly** from underlying delivery records rather than estimated by distributing each provider's total across the areas it operates in. That materially changes the picture: the most fragile standards are delivered in a median of one local skills area, where a proxy-based method implies far wider spread. Populations are also kept separate and always named — 644 standards with recorded 2024/25 activity, 604 of those still in the current offer, and 712 approved and not retired or withdrawn are different denominators and are never combined.
+There are **644 standards with recorded starts**, of which **202 are classified as severe thin or thin** (117 severe and 85 thin). Together they account for 3,415 of 353,463 standards-based starts, about 0.97%. Severe-thin standards have medians of eight starts and one active provider. The six tiers describe recorded volume and provider concentration; they do not establish financial unviability, unmet employer demand or a causal effect of standards proliferation.
+
+Keep the populations distinct: 644 delivered standards, 604 delivered and still available in the June catalogue, 675 available for new starts and 712 approved and not retired/withdrawn, including 37 paused. The 71 available standards with no recorded starts are reported separately from the six delivery tiers.
+
+The October publication corrections use stable ST references for geography and a bounded HR keyword for sector matching. The inclusive mapping has **139 unique core-sector standards**, **165 including the additional foundational category**, **191 standard-category links**, **24 standards matching multiple categories** and **23 matching multiple core sectors**. These are indicative rule-based links, not an official classification. Sector bars overlap and must not be summed.
 
 ## Data sources
 
@@ -16,33 +20,71 @@ All inputs are public. Download them into `Raw Data/` before running.
 | **Skills England apprenticeship catalogue** | Standard reference, status, route, level, funding band, approval and retirement dates | [Apprenticeship finder](https://skillsengland.education.gov.uk/apprenticeships/) → "Download a list of apprenticeships" → save as `Apprenticeships.csv` |
 | **DfE apprenticeships provider dashboard** | Unsuppressed provider × standard starts for 2024/25, used for provider counts | [Provider dashboard](https://department-for-education.shinyapps.io/apprenticeships-provider-dashboard/) → apply filters → download the current selection |
 | **Apprenticeship Provider and Assessment Register** | Registered providers and what they are permitted to deliver | Search gov.uk for "apprenticeship providers and assessment register"; export the register as CSV |
-| **ONS boundaries** | Local Skills Improvement Plan areas, local authority districts and regions, for mapping and area assignment | [ONS Open Geography Portal](https://geoportal.statistics.gov.uk/) — search "LSIP", "Local Authority Districts" and "Regions", full-clipped (BFC) versions |
-| **ONS local authority to combined authority lookup** | Assigns districts to mayoral strategic authorities | ONS Open Geography Portal — "Local Authority District to Combined Authority (May 2025) Lookup in EN" |
+| **ONS boundaries** | Boundary files used to construct the analytical areas, districts and regions | [ONS Open Geography Portal](https://geoportal.statistics.gov.uk/) — search "LSIP", "Local Authority Districts" and "Regions", full-clipped (BFC) versions |
+| **ONS local authority to combined authority lookup** | Assigns districts to the combined-authority/London geography in the May 2025 lookup | ONS Open Geography Portal — "Local Authority District to Combined Authority (May 2025) Lookup in EN" |
 
-Filenames expected by the scripts are listed in `00_config.R`. If a release supersedes these, update the paths there rather than anywhere else.
+Filenames expected by the scripts are listed in `00_config.R`. For exact publication reproduction retain these releases and extracts. A newly downloaded catalogue will change the snapshot. For a deliberate refresh, update the paths and parameters in `00_config.R`.
 
 Two things to know when collecting the data. The **provider dashboard** exports only the selection currently on screen, so the filters used determine what you get; the exports here are all levels, all age groups, 2024/25. And the **Skills England catalogue is a point-in-time extract** — ours is dated 1 June 2026, and any catalogue-derived time series must not extend beyond that date.
 
 ## Running the analysis
 
-Set the working directory to the folder containing the scripts and run:
+Install R and the packages used by the scripts:
+
+```r
+install.packages(c("tidyverse", "sf", "lubridate", "jsonlite"))
+```
+
+Put the scripts together and set the working directory to that folder. Supported layouts include:
+
+```text
+thin-markets-apprenticeships/   # cloned repository, with R scripts at its root
+  Raw Data/                   # supply the inputs separately
+  Outputs/                    # generated, not committed
+```
+
+The existing Drive layout also works: `02 Analysis/R Scripts` beside `02 Analysis/Raw Data`, writing to `02 Analysis/Outputs`. `00_config.R` first retains a valid configured root, then checks the parent and current directory for `Raw Data`. If more than one nearby project contains that folder, set the root explicitly to select the intended inputs.
+
+Run:
 
 ```r
 source("99_run_all.R")
 ```
 
-This runs the pipeline in order and writes `production_output_manifest.csv`, which records every expected output and whether it was produced. Scripts can also be run individually in numeric order; each documents at the top what it reads and what it produces.
+The runner executes `00_config.R` through `11_publication_outputs.R` in order. The new module is required, so keep it beside the other scripts. The first run rebuilds the older geography cache to retain stable ST references; later runs reuse compatible cached aggregates. Set `rebuild_geography <- TRUE` in the configuration to force a rebuild.
 
-`00_config.R` holds every parameter a refresh might need — file paths, reference year, classification thresholds, subject groupings — so nothing else hardcodes a year or a threshold.
+The pipeline requires the raw inputs, including the boundary RDS files named in `00_config.R`; it cannot run from code alone. They are not included in this repository. Current downloads may differ from the original point-in-time catalogue and dashboard exports. Keep the publication inputs if reproducing the frozen results.
 
-The geography preparation step is slow on first run because it unpacks and aggregates large underlying files. It caches its results, so later runs load in seconds. Set `rebuild_geography <- TRUE` to force a rebuild.
+Outputs go to `Outputs/tables` and `Outputs/charts`. Inspect:
 
-Outputs are written to `Outputs/tables` and `Outputs/charts`, with a data CSV saved alongside each chart so every figure traces back to the table behind it.
+- `production_output_manifest.csv`: expected files must be fresh and non-empty.
+- `publication_value_checks.csv`: structural reconciliations and, for the frozen snapshot, publication totals must pass.
+- `publication_figure_manifest.csv`: report labels mapped to production filenames and publication aliases.
+- `production_script_run_log.csv`: script execution timings.
 
-## Method and caveats
+The runner removes an explicit list of legacy generated outputs. It does not delete raw data. The illustrative table now selects ten severe and ten thin standards from explicit references, covering low, middle and upper severe volumes; it is a purposive illustration, not a representative sample or an exhaustive list of narrative examples.
 
-`METHODOLOGY-NOTE.md` sets out the data sources, definitions, classification thresholds and limitations in full, and is worth reading before quoting any figure. The sections on suppression and on population definitions matter most: several plausible-looking denominators exist and they are not interchangeable.
+## Publication figures
+
+`11_publication_outputs.R` exports PNG/SVG publication aliases and supporting CSVs from the existing R plot objects. It retains the Gatsby project’s original colours, themes and absence of gridlines. It does not read audit pictures or require an audit ZIP. Report labels below are the established audit labels; numbering in the final document may differ.
+
+| Audit/report label | Production PNG | Publication alias, also exported as SVG |
+|---|---|---|
+| Chart 3 | `chart_03_live_stock_of_standards.png` | `chart_03_reconstructed_stock.png` |
+| Chart 9 | `chart_10_is8_review_group_links.png` | `chart_09_corrected_inclusive_sector_links.png` |
+| Chart 10 | `chart_11_geographic_reach_by_market_tier.png` | `chart_10_corrected_geographic_reach.png` |
+| Figure 2 | `figure_02_all_proxy_linked_delivery.png` | `figure_02_direct_all_proxy_linked_starts.png` |
+| Map 2 | `map_01_review_group_delivery_by_lsip.png` | `map_02_direct_review_group_starts.png` |
+| Map 3 | `map_02_review_group_delivery_by_sector.png` | `map_03_corrected_sector_panels.png` |
+
+Figure 2 includes all proxy-linked delivered standards, not just the severe/thin review group used in Map 2. Geographic coverage is 633 of 637 eligible standards. The 42 analytical areas are 38 non-London LSIP areas plus four London subregions; they are not 42 designated LSIPs. Delivery locations measure recorded activity, not employer demand or access. Regional-strength callouts in the report are separately attributed policy context, not findings generated by the map.
+
+## Method and validation limits
+
+Read [METHODOLOGY-NOTE.md](METHODOLOGY-NOTE.md) before quoting figures. Summary-table suppression includes zero, so a `low` cell does not establish positive activity. Exact headline tiers use the unsuppressed dashboard export; historical and delivery-geography calculations use underlying starts archives.
+
+Saved October verification executed the focused R mapping, geography, plot and export steps and passed 41 publication reconciliations using retained audited inputs. It did not certify a full raw-data rebuild in the user’s Windows environment. This repository update does not claim a fresh full-pipeline run. A successful local `99_run_all.R` run and its manifests provide the rebuild check for the inputs supplied.
 
 ## Licensing
 
-Source data is published by the Department for Education, Skills England and the Office for National Statistics under the [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/). Figures relate to England only; apprenticeships are devolved and the other UK nations run separate systems. The reference year is 2024/25, using the July 2026 statistical release and a Skills England catalogue extract dated 1 June 2026.
+Source data from DfE, Skills England and ONS is published under the [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/). The source-data licence does not by itself license this repository’s code. Figures relate to England only.

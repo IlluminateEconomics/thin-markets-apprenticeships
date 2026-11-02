@@ -23,7 +23,8 @@ pipeline_scripts <- c(
   "07_geography.R",
   "08_approval_dates.R",
   "09_visualisations.R",
-  "10_maps.R"
+  "10_maps.R",
+  "11_publication_outputs.R"
 )
 
 
@@ -33,7 +34,7 @@ if (length(missing_scripts) > 0) {
   stop(
     "The full pipeline cannot run because these scripts are missing:\n  ",
     paste(missing_scripts, collapse = "\n  "),
-    "\nSet the working directory to Claude Analysis/Scripts-Clean.",
+    "\nSet the working directory to the folder containing these numbered R scripts.",
     call. = FALSE
   )
 }
@@ -147,7 +148,8 @@ expected_outputs <- dplyr::bind_rows(
       "chart_10_is8_review_group_links.png",
       "chart_11_geographic_reach_by_market_tier.png",
       "map_01_review_group_delivery_by_lsip.png",
-      "map_02_review_group_delivery_by_sector.png"
+      "map_02_review_group_delivery_by_sector.png",
+      "figure_02_all_proxy_linked_delivery.png"
     )
   ),
   tibble::tibble(
@@ -177,9 +179,13 @@ expected_outputs <- dplyr::bind_rows(
       "map_02_review_group_delivery_by_sector_data.csv",
       "map_coverage_summary.csv",
       "geography_standard_link_audit.csv",
-      "standard_link_audit.csv"
+      "standard_link_audit.csv",
+      "figure_02_all_proxy_linked_delivery_data.csv",
+      "publication_figure_manifest.csv",
+      "publication_value_checks.csv"
     )
-  )
+  ),
+  publication_expected_outputs
 ) %>%
   dplyr::mutate(
     path = dplyr::if_else(

@@ -24,6 +24,15 @@
 
 project_root <- "../.."
 
+# The Drive R Scripts folder sits directly beside Raw Data. Preserve an
+# existing valid root (including the older Scripts-Clean layout), otherwise
+# accept only these nearby layouts rather than requiring a manual path edit.
+if (!dir.exists(file.path(project_root, "Raw Data"))) {
+  nearby_roots <- c("..", ".")
+  nearby_roots <- nearby_roots[dir.exists(file.path(nearby_roots, "Raw Data"))]
+  if (length(nearby_roots) > 0) project_root <- nearby_roots[[1]]
+}
+
 if (!dir.exists(file.path(project_root, "Raw Data"))) {
   stop(
     "No 'Raw Data' folder found at: ",
@@ -410,7 +419,7 @@ src_skills_england <- paste0(
 )
 
 
-config_version <- "2026-08-11-audit3"
+config_version <- "2026-10-17-publication-R"
 
 message("00_config.R loaded (version ", config_version, "). ",
         "Reference year: ", ref_year_label, ". ",

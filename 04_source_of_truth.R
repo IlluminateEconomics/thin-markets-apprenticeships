@@ -486,7 +486,7 @@ is8_definitions <- list(
   ),
   list(
     sector = "Professional and Business Services",
-    title  = "consultant|consulting|business analyst|management|manager|project|legal|solicitor|paralegal|hr|human resources|procurement|marketing|sales|operations|leadership",
+    title  = "consultant|consulting|business analyst|management|manager|project|legal|solicitor|paralegal|\\bhr\\b|human resources|procurement|marketing|sales|operations|leadership",
     route  = "business and administration"
   ),
   list(
@@ -677,16 +677,31 @@ tier_examples <- thin_market_is8 %>%
          dominant_provider, delivery_context) %>%
   arrange(.data$tier, desc(.data$starts))
 
-# Report Table 1 is the first table mentioned in the body. It contains ten
-# illustrative standards from each of the two review tiers only. The broader
-# `tier_examples` object remains available in-session for audit work, but is no
-# longer exported as an ambiguously named report table.
-table_01_severe_thin_examples <- tier_examples %>%
-  filter(.data$tier %in% c("Severe thin market", "Thin market")) %>%
-  group_by(.data$tier) %>%
-  slice_head(n = 10) %>%
-  ungroup() %>%
-  arrange(.data$tier, desc(.data$starts))
+# Annex Table A1: purposive examples, not a representative sample. Use the
+# full population, rather than tier_examples (which contains only the largest
+# cases). Include the report's severe/thin examples, two one-start cases,
+# the severe-tier median of eight starts and Cabin Crew at 19 starts.
+# Composites Technician (26 starts, six providers) and the 97-start senior
+# rail standard are outside these two tiers and must not be labelled thin.
+report_example_refs <- c(
+  "ST0656", "ST1338", "ST0817", "ST0535", "ST0593", "ST0052",
+  "ST0859", "ST0315", "ST0495", "ST0558",
+  "ST0188", "ST0051", "ST0746", "ST0461", "ST1341", "ST0383", "ST0497",
+  "ST1311", "ST0791", "ST0995"
+)
+table_01_severe_thin_examples <- thin_market_is8 %>%
+  filter(.data$standard_ref %in% report_example_refs) %>%
+  select(tier, standard_ref, standard_name, route, level, starts, providers,
+         max_funding, regulated_standard, is8_sector,
+         dominant_provider, delivery_context) %>%
+  arrange(.data$tier, .data$starts, .data$standard_ref)
+
+stopifnot(
+  nrow(table_01_severe_thin_examples) == length(report_example_refs),
+  !anyDuplicated(table_01_severe_thin_examples$standard_ref),
+  sum(table_01_severe_thin_examples$tier == "Severe thin market") == 10L,
+  sum(table_01_severe_thin_examples$tier == "Thin market") == 10L
+)
 
 # Report Table 3 follows the native Functions and Owners table in the body.
 table_03_market_tier_summary <- tier_summary
